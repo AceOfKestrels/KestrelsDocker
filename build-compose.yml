@@ -1,5 +1,9 @@
-﻿service:
-    web-host:
-      build: 
-        context: .
-        dockerfile: ./web-host/Dockerfile
+﻿version: '3.9'
+services:
+  web-host:
+    image: web-host
+    build: 
+      context: .
+      dockerfile: ./web-host/Dockerfile
+    ports:
+      - "127.0.0.4:8080:80"
