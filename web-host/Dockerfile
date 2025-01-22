@@ -1,27 +1,18 @@
-﻿FROM alpine:latest
+﻿FROM nginx:alpine
 
 # install needed pakets
-RUN apk add --no-cache nginx git
+RUN apk add --no-cache git
 
 # download web site
-RUN git clone https://github.com/AceOfKestrels/KestrelsNest /tmp/site
+RUN git clone https://github.com/AceOfKestrels/KestrelsNest /var/www
 
 # delinting git artifacts
-RUN rm -rf /tmp/site/README.md
-RUN rm -rf /tmp/site/.gitignore
-RUN rm -rf /tmp/site/.git
+RUN rm -rf /var/www/README.md
+RUN rm -rf /var/www/.gitignore
+RUN rm -rf /var/www/.git
 
-# cleaning up web root
-RUN rm -rf  /var/www/*
+# Fixing perms
+RUN chmod 777 -R /var/www
 
-# Moving Website to web root
-RUN cp /tmp/site/* /var/www/ -R
-
-# Move NGIX Config file onto contaienr
-COPY ./web-host/data/Web-Server-Config/default /etc/nginx/
-
-#exposing ports
-EXPOSE 80/tcp
-EXPOSE 80/udp
-
-CMD ["nginx", "-g", "daemon off;"]
+# Move NGINX Config file onto contaienr
+COPY ./web-host/data/Web-Server-Config/nginx.conf /etc/nginx/nginx.conf
