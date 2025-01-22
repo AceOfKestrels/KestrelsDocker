@@ -1,0 +1,5 @@
+﻿service:
+    web-host:
+      build: 
+        context: .
+        dockerfile: ./web-host/Dockerfile
