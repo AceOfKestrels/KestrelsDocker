@@ -1,5 +1,7 @@
 ﻿FROM nginx:alpine
 
+RUN echo "Version: 0.0.1"
+
 # install needed pakets
 RUN apk add --no-cache git
 
