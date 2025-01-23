@@ -17,4 +17,4 @@ RUN git clone https://github.com/AceOfKestrels/KestrelsNest /var/www
 RUN chmod 777 -R /var/www
 
 # Move NGINX Config file onto contaienr
-COPY ./web-host/data/Web-Server-Config/nginx.conf /etc/nginx/nginx.conf
+COPY ./kestrelsnest-host/data/Web-Server-Config/nginx.conf /etc/nginx/nginx.conf
