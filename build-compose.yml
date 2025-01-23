@@ -1,0 +1,8 @@
+﻿services:
+  kestrelsnest-host:
+    image: kestrelsnest-host
+    build: 
+      context: .
+      dockerfile: ./web-host/Dockerfile
+    ports:
+      - "127.0.0.4:8080:8080"
