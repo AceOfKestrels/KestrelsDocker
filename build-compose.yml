@@ -4,7 +4,9 @@
     build: 
       context: .
       dockerfile: ./kestrelsnest-host/Dockerfile
-    ports:
-      - "127.0.0.4:80:80"
-    volumes:
-      - ./logs/kestrelsnest-host/:/var/log/nginx
+        
+  kestrelsdocker-reversproxy:
+    image: kestrelsdocker-reversproxy
+    build:
+      context: .
+      dockerfile: ./KestrelsDocker-ReversProxy/Dockerfile

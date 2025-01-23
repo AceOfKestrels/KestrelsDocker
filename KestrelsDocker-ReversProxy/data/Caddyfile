@@ -1,0 +1,14 @@
+{
+    email {$ADMIN_MAIL}
+    http_port 80
+    https_port 443
+}
+
+{$WEB_ADDRESS} {
+    reverse_proxy {$KESTRELSNEST_HOST}
+    reverse_proxy /api/* {$KESTRELSWIKI_HOST}
+    
+    tls {
+      dns cloudflare {$DNS_TOKEN}
+    }
+}
