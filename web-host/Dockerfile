@@ -9,9 +9,9 @@ RUN apk add --no-cache git
 RUN git clone https://github.com/AceOfKestrels/KestrelsNest /var/www
 
 # delinting git artifacts
-RUN rm -rf /var/www/README.md
-RUN rm -rf /var/www/.gitignore
-RUN rm -rf /var/www/.git
+#RUN rm -rf /var/www/README.md
+#RUN rm -rf /var/www/.gitignore
+#RUN rm -rf /var/www/.git
 
 # Fixing perms
 RUN chmod 777 -R /var/www

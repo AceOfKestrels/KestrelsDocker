@@ -1,6 +1,6 @@
 ﻿services:
-  web-host:
-    image: web-host
+  kestrelsnest-host:
+    image: kestrelsnest-host
     build: 
       context: .
       dockerfile: ./web-host/Dockerfile

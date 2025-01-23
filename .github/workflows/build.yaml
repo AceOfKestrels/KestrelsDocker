@@ -1,0 +1,52 @@
+﻿name: Build and Push Docker Images
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push Docker images
+        run: |
+          docker-compose -f build-compose.yaml config --services | while read -r service; do
+            image_name=$(docker-compose -f build-compose.yaml config | grep "image:" | awk '{print $2}' | sed -n "/$service/p")
+            if [ -z "$image_name" ]; then
+              echo "Image name not found for service: $service"
+              exit 1
+            fi
+            # Tag the image for GitHub Container Registry
+            image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
+            docker build --file Dockerfile --tag "$image_name_with_registry" .
+            docker push "$image_name_with_registry"
+          done
+
+      - name: Verify pushed images
+        run: |
+          docker-compose -f build-compose.yaml config --services | while read -r service; do
+            image_name=$(docker-compose -f build-compose.yaml config | grep "image:" | awk '{print $2}' | sed -n "/$service/p")
+            if [ -z "$image_name" ]; then
+              echo "Failed to push: $service"
+              exit 1
+            else
+              echo "Successfully pushed: $service"
+            fi
+          done
