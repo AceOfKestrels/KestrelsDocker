@@ -54,7 +54,8 @@ jobs:
             # Convert image_name_with_registry to lowercase
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
-            echo "Building and pushing: $image_name_with_registry"
+            prod_tag="${image_name_with_registry}:prod"
+            echo "Building and pushing: $image_name_with_registry with prod tag"
           
             # Define the build context and Dockerfile path
             build_context="."
@@ -78,16 +79,16 @@ jobs:
               dockerfile_path="$service_dockerfile"
             fi
           
-            # Build and push the Docker image
+            # Build and push the Docker image with both tags
             docker buildx build \
               --platform linux/amd64,linux/arm64 \
               --file "$dockerfile_path" \
               --tag "$image_name_with_registry" \
+              --tag "$prod_tag" \
               --push \
               "$build_context"
           done
-      
-      
+            
       # Step 6: Verify pushed images
       - name: Verify pushed images
         run: |
@@ -104,8 +105,9 @@ jobs:
             fi
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
-            if docker pull "$image_name_with_registry"; then
-              echo "Successfully pushed and verified: $service ($image_name_with_registry)"
+            prod_tag="${image_name_with_registry}:prod"
+            if docker pull "$image_name_with_registry" && docker pull "$prod_tag"; then
+              echo "Successfully pushed and verified: $service ($image_name_with_registry and $prod_tag)"
             else
               echo "Failed to verify image: $service"
               exit 1
