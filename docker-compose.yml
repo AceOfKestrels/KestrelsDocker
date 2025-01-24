@@ -1,0 +1,33 @@
+﻿services:
+  kestrelsnest-host:
+    image: ghcr.io/aceofkestrels/kestrelsnest-host:dev
+    networks:
+      kestrelsnest-host: {}
+    volumes:
+      - ./logs/kestrelsnest-host/nginx/:/var/log/nginx/
+    
+
+
+  kestrelsdocker-reversproxy:
+    image: ghcr.io/aceofkestrels/kestrelsdocker-reversproxy:dev
+    networks:
+      kestrelsnest-host: {}
+      kestrelwiki-host: {}
+    volumes:
+      - ./logs/KestrelsDocker-ReversProxy/caddy:/var/log/caddy/
+    ports: 
+      - "80:80"
+      - "443:443"
+    environment:
+      - DNS_TOKEN=<your CloudFlare dns api token>
+      - ADMIN_MAIL=<The Administrative Email Address>
+      - WEB_ADDRESS=<the domain the website is using>
+      
+
+networks:
+  kestrelsnest-host:
+    internal: true
+  kestrelwiki-host:
+    internal: true
+  redis-host:
+    internal: true
