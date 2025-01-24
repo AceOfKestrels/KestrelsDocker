@@ -27,3 +27,7 @@ EXPOSE 80 443
 
 # Start both cron and NGINX services
 CMD ["/bin/sh", "-c", "crond -f & nginx -g 'daemon off;'"]
+
+# Seting Labels for Container regestry
+LABEL org.opencontainers.image.authors="mail@annika-keggenhoff.de"
+LABEL org.opencontainers.image.description = "This is a Proconfigured NGINX Web Server that is supposed to be used with the KestrelsDocker Project"

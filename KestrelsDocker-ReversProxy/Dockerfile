@@ -23,3 +23,7 @@ ENV ADMIN_MAIL=mail@example.com
 ENV WEB_ADDRESS=example.com
 ENV KESTRELSNEST_HOST=http://kestrelsnest-host
 ENV KESTRELSWIKI_HOST=http://kestrelwiki-host
+
+# Seting Labels for Container regestry
+LABEL org.opencontainers.image.authors="mail@annika-keggenhoff.de"
+LABEL org.opencontainers.image.description = "This is a Proconfigured Caddy Revers proxy that is supposed to be used with the KestrelsDocker Project"
