@@ -1,6 +1,6 @@
 ﻿services:
   kestrelsnest-host:
-    image: ghcr.io/aceofkestrels/kestrelsnest-host:dev
+    image: ghcr.io/aceofkestrels/kestrelsnest-host:prod
     networks:
       kestrelsnest-host: {}
     volumes:
@@ -9,7 +9,7 @@
 
 
   kestrelsdocker-reversproxy:
-    image: ghcr.io/aceofkestrels/kestrelsdocker-reversproxy:dev
+    image: ghcr.io/aceofkestrels/kestrelsdocker-reversproxy:prod
     networks:
       kestrelsnest-host: {}
       kestrelwiki-host: {}
