@@ -11,4 +11,25 @@
     tls {
       dns cloudflare {$DNS_TOKEN}
     }
+
+    # access log Config
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 10mb
+            roll_keep 5
+            roll_keep_for 72h
+        }
+        level info
+    }
+
+    # error log configuration
+    log {
+        format single_field common_log
+        output file /var/log/caddy/error.log {
+            roll_size 10mb
+            roll_keep 5
+            roll_keep_for 72h
+        }
+        level error
+    }
 }
