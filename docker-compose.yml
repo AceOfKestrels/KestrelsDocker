@@ -1,13 +1,14 @@
 ﻿services:
+  
+  # The Host for the Content of the KestralsNest Website
   kestrelsnest-host:
     image: ghcr.io/aceofkestrels/kestrelsnest-host:prod
     networks:
       kestrelsnest-host: {}
     volumes:
       - ./logs/kestrelsnest-host/nginx/:/var/log/nginx/
-    
-
-
+  
+  # The ReversProxy that Routes the Web Traffic to the corresponding backend servers
   kestrelsdocker-reversproxy:
     image: ghcr.io/aceofkestrels/kestrelsdocker-reversproxy:prod
     networks:
@@ -22,6 +23,20 @@
       - DNS_TOKEN=<your CloudFlare dns api token>
       - ADMIN_MAIL=<The Administrative Email Address>
       - WEB_ADDRESS=<the domain the website is using>
+  
+  # The API host of the KetrelsWiki
+  kestrelwiki-host:
+    image: ghcr.io/aceofkestrels/kestrelwiki-host:prod
+    networks:
+      kestrelwiki-host: {}
+      keydb-host: {}
+  
+  # The redis to be used with the KestrelsWiki
+  kestrelsdocker-keyDB:
+    image: eqalpha/keydb
+    networks:
+      keydb-host: {}
+  
       
 
 networks:
@@ -29,5 +44,5 @@ networks:
     internal: true
   kestrelwiki-host:
     internal: true
-  redis-host:
+  keydb-host:
     internal: true
