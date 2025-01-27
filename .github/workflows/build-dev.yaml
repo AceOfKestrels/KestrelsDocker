@@ -44,12 +44,19 @@ jobs:
           echo "Validating Caddyfiles..."
           find . -name 'Caddyfile' | while read caddyfile; do
             echo "Validating $caddyfile"
-            docker run --rm -v "$(pwd):/srv" caddy:2.6.4 caddy validate --config "/srv/$caddyfile" || {
+            docker run --rm \
+              -e ADMIN_MAIL=your_email@example.com \
+              -e WEB_ADDRESS=example.com \
+              -e KESTRELSNEST_HOST=http://kestrelsnest-host \
+              -e KESTRELSWIKI_HOST=http://kestrelwiki-host \
+              -e DNS_TOKEN=example_token \
+              -v "$(pwd):/srv" ghcr.io/caddybuilds/caddy-cloudflare:latest caddy validate --config "/srv/$caddyfile" || {
               echo "❌ Validation failed for $caddyfile"
               exit 1
             }
           done
           echo "✅ All Caddyfiles are valid."
+
 
   build-images:
     name: Build and Push Docker Images
@@ -63,7 +70,7 @@ jobs:
       - name: Install Docker Compose and yq
         run: |
           sudo apt-get update
-          sudo apt-get install -y docker-compose=1.29.2 yq=4.16.1
+          sudo apt-get install -y docker-compose yq
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -117,7 +124,7 @@ jobs:
       - name: Install Docker Compose and yq
         run: |
           sudo apt-get update
-          sudo apt-get install -y docker-compose=1.29.2 yq=4.16.1
+          sudo apt-get install -y docker-compose yq
 
       - name: Verify pushed images
         run: |

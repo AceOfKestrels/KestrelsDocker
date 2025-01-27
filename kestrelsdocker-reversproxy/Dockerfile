@@ -15,7 +15,7 @@ EXPOSE 80 443
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 
 # Copy the custom Caddyfile configuration
-COPY ./KestrelsDocker-ReversProxy/data/Caddyfile /etc/caddy/Caddyfile
+COPY ./kestrelsdocker-reversproxy/data/Caddyfile /etc/caddy/Caddyfile
 
 # Set environment variables used in the Caddyfile
 ENV DNS_TOKEN=example_dns-token \

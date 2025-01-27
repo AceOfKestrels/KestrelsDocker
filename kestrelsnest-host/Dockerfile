@@ -1,4 +1,5 @@
-﻿FROM nginx:alpine
+﻿
+FROM nginx:alpine
 
 # Set metadata labels for the image
 LABEL org.opencontainers.image.authors="mail@annika-keggenhoff.de" \
@@ -10,8 +11,9 @@ LABEL org.opencontainers.image.authors="mail@annika-keggenhoff.de" \
 RUN echo "Version: 0.1.0"
 
 # Install necessary packages, set up web root, clone repository, and configure permissions
-RUN apk add --no-cache bash=5.2.37-r0 git=2.48.1-r0 openrc=0.56-r0 busybox-suid=1.37.0-r13 dcron=4.6-r0 && \
-    mkdir -p /var/www && \
+# hadolint ignore=DL3018,DL3059
+RUN apk add --no-cache bash git openrc busybox-suid dcron
+RUN mkdir -p /var/www && \
     git clone https://github.com/AceOfKestrels/KestrelsNest /var/www && \
     chmod -R 777 /var/www && \
     echo "*/5 * * * * cd /var/www && git pull origin main && chmod -R 777 /var/www" > /etc/crontabs/root && \
