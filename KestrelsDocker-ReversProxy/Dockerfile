@@ -1,31 +1,31 @@
-﻿# using official caddy alpine builder image
+﻿# Stage 1: Build custom Caddy binary with Cloudflare DNS module
 FROM caddy:builder-alpine AS builder
 
-# starting build procces with Cloudflair DNS Modul
-RUN caddy-builder \
-    github.com/caddy-dns/cloudflare
+# Build Caddy with the Cloudflare DNS module
+RUN xcaddy build \
+    --with github.com/caddy-dns/cloudflare
 
-# Using offical caddy Alpine img
+# Stage 2: Create the final container
 FROM caddy:alpine
 
-# Exposing Webports
+# Expose HTTP and HTTPS ports
 EXPOSE 80 443
 
-# Geting the custom caddy Binarys from the build container
+# Copy the custom Caddy binary from the builder stage
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 
-# Moving Caddy Config file to Config Dir
+# Copy the custom Caddyfile configuration
 COPY ./KestrelsDocker-ReversProxy/data/Caddyfile /etc/caddy/Caddyfile
 
-# Setting up ENV Variabels used to cinfigure Caddyfile
-ENV DNS_TOKEN=example_dns-token
-ENV ADMIN_MAIL=mail@example.com
-ENV WEB_ADDRESS=example.com
-ENV KESTRELSNEST_HOST=http://kestrelsnest-host
-ENV KESTRELSWIKI_HOST=http://kestrelwiki-host
+# Set environment variables used in the Caddyfile
+ENV DNS_TOKEN=example_dns-token \
+    ADMIN_MAIL=mail@example.com \
+    WEB_ADDRESS=example.com \
+    KESTRELSNEST_HOST=http://kestrelsnest-host \
+    KESTRELSWIKI_HOST=http://kestrelwiki-host
 
-# Seting Labels for Container regestry
-LABEL org.opencontainers.image.authors="mail@annika-keggenhoff.de"
-LABEL org.opencontainers.image.source=https://github.com/AceOfKestrels/KestrelsDocker
-LABEL org.opencontainers.image.licenses=Apache-2.0
-LABEL org.opencontainers.image.description = "This is a Proconfigured Caddy Revers proxy that is supposed to be used with the KestrelsDocker Project"
+# Add metadata labels for the container registry
+LABEL org.opencontainers.image.authors="mail@annika-keggenhoff.de" \
+      org.opencontainers.image.source="https://github.com/AceOfKestrels/KestrelsDocker" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.description="This is a preconfigured Caddy reverse proxy for the KestrelsDocker project."
