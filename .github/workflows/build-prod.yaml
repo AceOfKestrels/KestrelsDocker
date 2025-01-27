@@ -1,4 +1,4 @@
-name: Build Containers on main branch and latest tag
+name: Build Containers on main branch and prod tag
 
 on:
   push:
@@ -7,37 +7,84 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-push:
-    name: Build and Push Docker Images
+  validate-files:
+    name: Validate Dockerfiles, nginx.conf, and Caddyfiles
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout repository
       - name: Checkout code
         uses: actions/checkout@v4
-        
-      # Step 2: Set up Docker Compose and install yq
+
+      - name: Validate Dockerfiles
+        run: |
+          echo "Validating Dockerfiles..."
+          find . -name 'Dockerfile' | while read dockerfile; do
+            echo "Validating $dockerfile"
+            docker run --rm -i hadolint/hadolint < "$dockerfile" || {
+              echo "❌ Validation failed for $dockerfile"
+              exit 1
+            }
+          done
+          echo "✅ All Dockerfiles are valid."
+
+      - name: Validate nginx.conf files
+        run: |
+          echo "Validating nginx.conf files..."
+          find . -name 'nginx.conf' | while read nginx_conf; do
+            echo "Validating $nginx_conf"
+            docker run --rm -v "$(pwd):/config" nginx:stable nginx -t -c "/config/$nginx_conf" || {
+              echo "❌ Validation failed for $nginx_conf"
+              exit 1
+            }
+          done
+          echo "✅ All nginx.conf files are valid."
+
+      - name: Validate Caddyfiles
+        run: |
+          echo "Validating Caddyfiles..."
+          find . -name 'Caddyfile' | while read caddyfile; do
+            echo "Validating $caddyfile"
+            docker run --rm \
+              -e ADMIN_MAIL=your_email@example.com \
+              -e WEB_ADDRESS=example.com \
+              -e KESTRELSNEST_HOST=http://kestrelsnest-host \
+              -e KESTRELSWIKI_HOST=http://kestrelwiki-host \
+              -e DNS_TOKEN=example_token \
+              -v "$(pwd):/srv" ghcr.io/caddybuilds/caddy-cloudflare:latest caddy validate --config "/srv/$caddyfile" || {
+              echo "❌ Validation failed for $caddyfile"
+              exit 1
+            }
+          done
+          echo "✅ All Caddyfiles are valid."
+
+
+  build-images:
+    name: Build and Push Docker Images
+    needs: validate-files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Install Docker Compose and yq
         run: |
           sudo apt-get update
           sudo apt-get install -y docker-compose yq
-        
-      # Step 3: Log in to GitHub Container Registry
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
-      # Step 4: Set up Docker Buildx
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
           platforms: linux/amd64,linux/arm64
           install: true
-      
-      # Step 5:  Build and push Docker images
+
       - name: Build and push Docker images
         run: |
           services=$(docker-compose -f build-compose.yml config --services)
@@ -48,69 +95,56 @@ jobs:
               found && /image:/ {print $2; exit}
             ')
             if [ -z "$image_name" ]; then
-              echo "Image name not found for service: $service"
+              echo "❌ Image name not found for service: $service"
               exit 1
             fi
-            # Convert image_name_with_registry to lowercase
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
             prod_tag="${image_name_with_registry}:prod"
             echo "Building and pushing: $image_name_with_registry with prod tag"
           
-            # Define the build context and Dockerfile path
-            build_context="."
-            dockerfile_path="./${image_name}/Dockerfile"
-          
-            # Check if a specific build context or Dockerfile is defined for the service
-            service_build_context=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
-              $0 ~ srv {found=1}
-              found && /context:/ {print $2; exit}
-            ')
-            service_dockerfile=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
-              $0 ~ srv {found=1}
-              found && /dockerfile:/ {print $2; exit}
-            ')
-          
-            # Override defaults if specific paths are defined
-            if [ -n "$service_build_context" ]; then
-              build_context="$service_build_context"
-            fi
-            if [ -n "$service_dockerfile" ]; then
-              dockerfile_path="$service_dockerfile"
-            fi
-          
-            # Build and push the Docker image with both tags
             docker buildx build \
               --platform linux/amd64,linux/arm64 \
-              --file "$dockerfile_path" \
+              --file "./${image_name}/Dockerfile" \
               --tag "$image_name_with_registry" \
               --tag "$prod_tag" \
               --push \
-              "$build_context"
+              .
           done
-            
-      # Step 6: Verify pushed images
+
+  validate-images:
+    name: Validate Docker Images
+    needs: build-images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Docker Compose and yq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose yq
+
       - name: Verify pushed images
         run: |
           services=$(docker-compose -f build-compose.yml config --services)
           for service in $services; do
-            # Use yq to extract the image name, handling special characters in service names
             image_name=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
               $0 ~ srv {found=1}
               found && /image:/ {print $2; exit}
             ')
             if [ -z "$image_name" ]; then
-              echo "Image name not found for service: $service"
+              echo "❌ Image name not found for service: $service"
               exit 1
             fi
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
             prod_tag="${image_name_with_registry}:prod"
             if docker pull "$image_name_with_registry" && docker pull "$prod_tag"; then
-              echo "Successfully pushed and verified: $service ($image_name_with_registry and $prod_tag)"
+              echo "✅ Successfully pushed and verified: $service ($image_name_with_registry and $prod_tag)"
             else
-              echo "Failed to verify image: $service"
+              echo "❌ Failed to verify image: $service"
               exit 1
             fi
           done
-      

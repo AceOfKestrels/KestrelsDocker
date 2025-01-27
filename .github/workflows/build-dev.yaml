@@ -1,4 +1,4 @@
-﻿name: Build Containers on dev branch and latest tag
+﻿name: Build Containers on dev branch and dev tag
 
 on:
   push:
