@@ -18,7 +18,9 @@ RUN apk add --no-cache bash=5.2.37-r0 git=2.48.1-r0 openrc=0.56-r0 busybox-suid=
     chmod 0644 /etc/crontabs/root
 
 # Copy the custom NGINX configuration into the container
-COPY ./kestrelsnest-host/data/Web-Server-Config/nginx.conf /etc/nginx/nginx.conf
+COPY ./kestrelsnest-host/data/nginx.conf /etc/nginx/nginx.conf
+COPY ./kestrelsnest-host/data/mime.types /etc/nginx/mime.types
+
 
 # Expose HTTP and HTTPS ports
 EXPOSE 80 443
