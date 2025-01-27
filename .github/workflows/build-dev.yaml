@@ -7,8 +7,57 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-push:
+  validate-files:
+    name: Validate Dockerfiles, nginx.conf, and Caddyfiles
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # Step 2: Validate Dockerfiles
+      - name: Validate Dockerfiles
+        run: |
+          echo "Validating Dockerfiles..."
+          find . -name 'Dockerfile' | while read dockerfile; do
+            echo "Validating $dockerfile"
+            docker run --rm -i hadolint/hadolint < "$dockerfile" || {
+              echo "Validation failed for $dockerfile"
+              exit 1
+            }
+          done
+          echo "All Dockerfiles are valid."
+
+      # Step 3: Validate nginx.conf files
+      - name: Validate nginx.conf files
+        run: |
+          echo "Validating nginx.conf files..."
+          find . -name 'nginx.conf' | while read nginx_conf; do
+            echo "Validating $nginx_conf"
+            docker run --rm -v "$(pwd):/config" nginx:latest nginx -t -c "/config/$nginx_conf" || {
+              echo "Validation failed for $nginx_conf"
+              exit 1
+            }
+          done
+          echo "All nginx.conf files are valid."
+
+      # Step 4: Validate Caddyfiles
+      - name: Validate Caddyfiles
+        run: |
+          echo "Validating Caddyfiles..."
+          find . -name 'Caddyfile' | while read caddyfile; do
+            echo "Validating $caddyfile"
+            docker run --rm -v "$(pwd):/srv" caddy:latest caddy validate --config "/srv/$caddyfile" || {
+              echo "Validation failed for $caddyfile"
+              exit 1
+            }
+          done
+          echo "All Caddyfiles are valid."
+
+  build-images:
     name: Build and Push Docker Images
+    needs: validate-files
     runs-on: ubuntu-latest
 
     steps:
@@ -51,7 +100,6 @@ jobs:
               echo "Image name not found for service: $service"
               exit 1
             fi
-            # Convert image_name_with_registry to lowercase
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
             dev_tag="${image_name_with_registry}:dev"
@@ -88,13 +136,28 @@ jobs:
               --push \
               "$build_context"
           done
-      
-      # Step 6: Verify pushed images
+          
+  validate-images:
+    name: Validate Docker Images
+    needs: build-images
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Install Docker Compose and yq
+      - name: Install Docker Compose and yq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose yq
+
+      # Step 3: Verify pushed images
       - name: Verify pushed images
         run: |
           services=$(docker-compose -f build-compose.yml config --services)
           for service in $services; do
-            # Use yq to extract the image name, handling special characters in service names
             image_name=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
               $0 ~ srv {found=1}
               found && /image:/ {print $2; exit}
