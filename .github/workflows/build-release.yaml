@@ -1,4 +1,4 @@
-name: Build and Push Docker Images on Release
+﻿name: Build and Push Docker Images on Release
 
 on:
   release:
@@ -6,6 +6,57 @@ on:
       - published
 
 jobs:
+  validate-files:
+    name: Validate Dockerfiles, nginx.conf, and Caddyfiles
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Dockerfiles
+        run: |
+          echo "Validating Dockerfiles..."
+          find . -name 'Dockerfile' | while read dockerfile; do
+            echo "Validating $dockerfile"
+            docker run --rm -i hadolint/hadolint < "$dockerfile" || {
+              echo "❌ Validation failed for $dockerfile"
+              exit 1
+            }
+          done
+          echo "✅ All Dockerfiles are valid."
+
+      - name: Validate nginx.conf files
+        run: |
+          echo "Validating nginx.conf files..."
+          find . -name 'nginx.conf' | while read nginx_conf; do
+            echo "Validating $nginx_conf"
+            docker run --rm -v "$(pwd):/config" nginx:stable nginx -t -c "/config/$nginx_conf" || {
+              echo "❌ Validation failed for $nginx_conf"
+              exit 1
+            }
+          done
+          echo "✅ All nginx.conf files are valid."
+
+      - name: Validate Caddyfiles
+        run: |
+          echo "Validating Caddyfiles..."
+          find . -name 'Caddyfile' | while read caddyfile; do
+            echo "Validating $caddyfile"
+            docker run --rm \
+              -e ADMIN_MAIL=your_email@example.com \
+              -e WEB_ADDRESS=example.com \
+              -e KESTRELSNEST_HOST=http://kestrelsnest-host \
+              -e KESTRELSWIKI_HOST=http://kestrelwiki-host \
+              -e DNS_TOKEN=example_token \
+              -v "$(pwd):/srv" ghcr.io/caddybuilds/caddy-cloudflare:latest caddy validate --config "/srv/$caddyfile" || {
+              echo "❌ Validation failed for $caddyfile"
+              exit 1
+            }
+          done
+          echo "✅ All Caddyfiles are valid."
+
+
 
   build-images:
     name: Build and Push Docker Images
@@ -14,9 +65,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install Docker Compose and yq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose yq
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          fetch-depth: 0
-          ref: ${{ github.event.release.tag_name }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -24,64 +84,36 @@ jobs:
           platforms: linux/amd64,linux/arm64
           install: true
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}  # Consider using a PAT instead
-
-      - name: Build and push Docker images with annotations
+      - name: Build and push Docker images
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          set -e  # Stop script if any command fails
-          echo "📌 Release tag: $RELEASE_TAG"
-
-          services=$(docker compose -f build-compose.yml config --services)
+          echo "Release tag: $RELEASE_TAG"
+          services=$(docker-compose -f build-compose.yml config --services)
           for service in $services; do
-            echo "🚀 Processing service: $service"
-
-            # Extract image name from docker-compose.yml
-            image_name=$(docker compose -f build-compose.yml config | awk -v srv="$service" '
+            echo "Processing service: $service"
+            image_name=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
               $0 ~ srv {found=1}
               found && /image:/ {print $2; exit}
             ')
-
             if [ -z "$image_name" ]; then
               echo "❌ Image name not found for service: $service"
               exit 1
             fi
-          
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
             tag="${image_name_with_registry}:${RELEASE_TAG}"
-
-            # Extract labels from Dockerfile (multi-line safe)
-            if [ -f "./${image_name}/Dockerfile" ]; then
-              LABELS=$(awk '/^LABEL/{for(i=2;i<=NF;i++) printf "--label \"%s\" ", $i}' "./${image_name}/Dockerfile")
-              if [ -z "$LABELS" ]; then
-                echo "⚠️ No labels found in Dockerfile for $image_name."
-              else
-                echo "✅ Labels extracted: $LABELS"
-              fi
-            else
-              echo "⚠️ Warning: Dockerfile not found for $image_name. Skipping label extraction."
-              LABELS=""
-            fi
-
-            echo "🔨 Building and pushing: $image_name_with_registry with annotations and prod tag"
-
+            echo "Building and pushing: $image_name_with_registry with prod tag"
+          
             docker buildx build \
               --platform linux/amd64,linux/arm64 \
               --file "./${image_name}/Dockerfile" \
               --tag "$image_name_with_registry" \
               --tag "$tag" \
               --push \
-              $LABELS \
               .
           done
-
+        
   validate-images:
     name: Validate Docker Images
     needs: build-images
@@ -91,15 +123,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Docker Compose and yq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose yq
+
       - name: Verify pushed images
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          set -e  # Stop script if any command fails
-          
-          services=$(docker compose -f build-compose.yml config --services)
+          services=$(docker-compose -f build-compose.yml config --services)
           for service in $services; do
-            image_name=$(docker compose -f build-compose.yml config | awk -v srv="$service" '
+            image_name=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
               $0 ~ srv {found=1}
               found && /image:/ {print $2; exit}
             ')
@@ -110,7 +145,6 @@ jobs:
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
             tag="${image_name_with_registry}:${RELEASE_TAG}"
-
             if docker pull "$image_name_with_registry" && docker pull "$tag"; then
               echo "✅ Successfully pushed and verified: $service ($image_name_with_registry and $tag)"
             else
