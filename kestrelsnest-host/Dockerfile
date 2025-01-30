@@ -2,10 +2,14 @@
 FROM nginx:alpine
 
 # Set metadata labels for the image
-LABEL org.opencontainers.image.authors="mail@annika-keggenhoff.de" \
-      org.opencontainers.image.source="https://github.com/AceOfKestrels/KestrelsDocker" \
-      org.opencontainers.image.licenses="Apache-2.0" \
-      org.opencontainers.image.description="This is a preconfigured NGINX web server for the KestrelsDocker project."
+# hadolint ignore=DL3018,DL3059
+LABEL org.opencontainers.image.authors="mail@annika-keggenhoff.de"
+# hadolint ignore=DL3018,DL3059
+LABEL org.opencontainers.image.source="https://github.com/AceOfKestrels/KestrelsDocker"
+# hadolint ignore=DL3018,DL3059
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+# hadolint ignore=DL3018,DL3059
+LABEL org.opencontainers.image.description="This is a preconfigured NGINX web server for the KestrelsDocker project."
 
 # Echo the version for documentation purposes
 RUN echo "Version: 0.1.0"

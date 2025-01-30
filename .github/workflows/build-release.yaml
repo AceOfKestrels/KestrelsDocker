@@ -18,10 +18,10 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name }}
 
-      - name: Install Docker Compose and yq
+      - name: Install Docker Compose and yq and qemu-user-static
         run: |
           sudo apt-get update
-          sudo apt-get install -y docker-compose yq
+          sudo apt-get install -y docker-compose yq qemu-user-static
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -36,36 +36,59 @@ jobs:
           platforms: linux/amd64,linux/arm64
           install: true
 
-      - name: Build and push Docker images
+      - name: Build and push Docker images with annotations
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          echo "Release tag: $RELEASE_TAG"
+          set -e  # Stop script if any command fails
+          echo "📌 Release tag: $RELEASE_TAG"
+          
           services=$(docker-compose -f build-compose.yml config --services)
           for service in $services; do
-            echo "Processing service: $service"
+            echo "🚀 Processing service: $service"
+
+            # Extract image name from docker-compose.yml
             image_name=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
               $0 ~ srv {found=1}
               found && /image:/ {print $2; exit}
             ')
+
             if [ -z "$image_name" ]; then
               echo "❌ Image name not found for service: $service"
               exit 1
             fi
+          
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
             tag="${image_name_with_registry}:${RELEASE_TAG}"
-            echo "Building and pushing: $image_name_with_registry with prod tag"
-          
+
+            # Extract labels from Dockerfile
+            if [ -f "./${image_name}/Dockerfile" ]; then
+              LABELS=$(grep '^LABEL ' "./${image_name}/Dockerfile" | sed 's/^LABEL //g' | tr '\n' ' ')
+              if [ -z "$LABELS" ]; then
+                echo "⚠️ No labels found in Dockerfile for $image_name."
+                LABEL_ARGS=""
+              else
+                echo "✅ Labels extracted: $LABELS"
+                LABEL_ARGS=$(echo "$LABELS" | awk '{for(i=1;i<=NF;i++) print "--label \"" $i "\"" }')
+              fi
+            else
+              echo "⚠️ Warning: Dockerfile not found for $image_name. Skipping label extraction."
+              LABEL_ARGS=""
+            fi
+
+            echo "🔨 Building and pushing: $image_name_with_registry with annotations and prod tag"
+
             docker buildx build \
               --platform linux/amd64,linux/arm64 \
               --file "./${image_name}/Dockerfile" \
               --tag "$image_name_with_registry" \
               --tag "$tag" \
               --push \
+              $LABEL_ARGS \
               .
-          done
-        
+          done  # Ensure the loop is properly closed
+
   validate-images:
     name: Validate Docker Images
     needs: build-images
@@ -84,6 +107,8 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
+          set -e  # Stop script if any command fails
+          
           services=$(docker-compose -f build-compose.yml config --services)
           for service in $services; do
             image_name=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
@@ -97,6 +122,7 @@ jobs:
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
             tag="${image_name_with_registry}:${RELEASE_TAG}"
+
             if docker pull "$image_name_with_registry" && docker pull "$tag"; then
               echo "✅ Successfully pushed and verified: $service ($image_name_with_registry and $tag)"
             else
