@@ -1,19 +1,6 @@
 ﻿
 FROM nginx:alpine
 
-# Set metadata labels for the image
-# hadolint ignore=DL3018,DL3059
-LABEL org.opencontainers.image.authors="mail@annika-keggenhoff.de"
-# hadolint ignore=DL3018,DL3059
-LABEL org.opencontainers.image.source="https://github.com/AceOfKestrels/KestrelsDocker"
-# hadolint ignore=DL3018,DL3059
-LABEL org.opencontainers.image.licenses="Apache-2.0"
-# hadolint ignore=DL3018,DL3059
-LABEL org.opencontainers.image.description="This is a preconfigured NGINX web server for the KestrelsDocker project."
-
-# Echo the version for documentation purposes
-RUN echo "Version: 0.1.0"
-
 # Install necessary packages, set up web root, clone repository, and configure permissions
 # hadolint ignore=DL3018,DL3059
 RUN apk add --no-cache bash git openrc busybox-suid dcron

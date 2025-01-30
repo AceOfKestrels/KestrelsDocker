@@ -23,13 +23,3 @@ ENV DNS_TOKEN=example_dns-token \
     WEB_ADDRESS=example.com \
     KESTRELSNEST_HOST=http://kestrelsnest-host \
     KESTRELSWIKI_HOST=http://kestrelwiki-host
-
-# Add metadata labels for the container registry
-# hadolint ignore=DL3018,DL3059
-LABEL org.opencontainers.image.authors="mail@annika-keggenhoff.de"
-# hadolint ignore=DL3018,DL3059
-LABEL org.opencontainers.image.source="https://github.com/AceOfKestrels/KestrelsDocker"
-# hadolint ignore=DL3018,DL3059
-LABEL org.opencontainers.image.licenses="Apache-2.0"
-# hadolint ignore=DL3018,DL3059
-LABEL org.opencontainers.image.description="This is a preconfigured Caddy reverse proxy for the KestrelsDocker project."

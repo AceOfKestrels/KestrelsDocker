@@ -3,18 +3,23 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
 
 # Install Git
+# hadolint ignore=DL3015,DL3008
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
+
 # Clone the repository
+# hadolint ignore=DL3059
 RUN git clone https://github.com/AceOfKestrels/KestrelsWiki src
 
 # Change working directory to the source
 WORKDIR /app/src
 
 # Restore dependencies
+# hadolint ignore=DL3059
 RUN dotnet restore
 
 # Build and publish the application
+# hadolint ignore=DL3059
 RUN dotnet publish -c Release -o out
 
 # Use the official ASP.NET runtime image for production

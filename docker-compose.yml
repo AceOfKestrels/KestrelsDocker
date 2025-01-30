@@ -16,20 +16,28 @@
       kestrelwiki-host: {}
     volumes:
       - ./logs/KestrelsDocker-ReversProxy/caddy:/var/log/caddy/
+      - ./data/caddy-data:/data
     ports: 
       - "80:80"
       - "443:443"
     environment:
-      - DNS_TOKEN=<your CloudFlare dns api token>
-      - ADMIN_MAIL=<The Administrative Email Address>
-      - WEB_ADDRESS=<the domain the website is using>
-  
+      - DNS_TOKEN={$CLOUDFLARE_TOKEN}
+      - ADMIN_MAIL={$ADMIN_EMAIL}
+      - WEB_ADDRESS={$WEB_ADRESS}
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8 
+
   # The API host of the KetrelsWiki
   kestrelwiki-host:
     image: ghcr.io/aceofkestrels/kestrelwiki-host:prod
     networks:
       kestrelwiki-host: {}
       keydb-host: {}
+    environment:
+      - WEBPAGE_REPOSITORY={$WEBPAGE_GIT_REPO}
+    volumes:
+      - /logs/kestrelwiki-host/api:/var/log/kestrelswiki
   
   # The redis to be used with the KestrelsWiki
   kestrelsdocker-keyDB:
@@ -37,12 +45,12 @@
     networks:
       keydb-host: {}
   
-      
-
 networks:
+  kestrelsdocker-reversproxy:
+    internal: false
   kestrelsnest-host:
-    internal: true
+    internal: false
   kestrelwiki-host:
-    internal: true
+    internal: false
   keydb-host:
     internal: true
