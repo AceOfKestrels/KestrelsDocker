@@ -1,4 +1,4 @@
-﻿name: Build and Push Docker Images on Release
+name: Build and Push Docker Images on Release
 
 on:
   release:
@@ -18,23 +18,18 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name }}
 
-      - name: Install Docker Compose and yq and qemu-user-static
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose yq qemu-user-static
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+          install: true
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
-          install: true
+          password: ${{ secrets.GITHUB_TOKEN }}  # Consider using a PAT instead
 
       - name: Build and push Docker images with annotations
         env:
@@ -42,13 +37,13 @@ jobs:
         run: |
           set -e  # Stop script if any command fails
           echo "📌 Release tag: $RELEASE_TAG"
-          
-          services=$(docker-compose -f build-compose.yml config --services)
+
+          services=$(docker compose -f build-compose.yml config --services)
           for service in $services; do
             echo "🚀 Processing service: $service"
 
             # Extract image name from docker-compose.yml
-            image_name=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
+            image_name=$(docker compose -f build-compose.yml config | awk -v srv="$service" '
               $0 ~ srv {found=1}
               found && /image:/ {print $2; exit}
             ')
@@ -62,19 +57,17 @@ jobs:
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
             tag="${image_name_with_registry}:${RELEASE_TAG}"
 
-            # Extract labels from Dockerfile
+            # Extract labels from Dockerfile (multi-line safe)
             if [ -f "./${image_name}/Dockerfile" ]; then
-              LABELS=$(grep '^LABEL ' "./${image_name}/Dockerfile" | sed 's/^LABEL //g' | tr '\n' ' ')
+              LABELS=$(awk '/^LABEL/{for(i=2;i<=NF;i++) printf "--label \"%s\" ", $i}' "./${image_name}/Dockerfile")
               if [ -z "$LABELS" ]; then
                 echo "⚠️ No labels found in Dockerfile for $image_name."
-                LABEL_ARGS=""
               else
                 echo "✅ Labels extracted: $LABELS"
-                LABEL_ARGS=$(echo "$LABELS" | awk '{for(i=1;i<=NF;i++) print "--label \"" $i "\"" }')
               fi
             else
               echo "⚠️ Warning: Dockerfile not found for $image_name. Skipping label extraction."
-              LABEL_ARGS=""
+              LABELS=""
             fi
 
             echo "🔨 Building and pushing: $image_name_with_registry with annotations and prod tag"
@@ -85,9 +78,9 @@ jobs:
               --tag "$image_name_with_registry" \
               --tag "$tag" \
               --push \
-              $LABEL_ARGS \
+              $LABELS \
               .
-          done  # Ensure the loop is properly closed
+          done
 
   validate-images:
     name: Validate Docker Images
@@ -98,20 +91,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Docker Compose and yq
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose yq
-
       - name: Verify pushed images
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -e  # Stop script if any command fails
           
-          services=$(docker-compose -f build-compose.yml config --services)
+          services=$(docker compose -f build-compose.yml config --services)
           for service in $services; do
-            image_name=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
+            image_name=$(docker compose -f build-compose.yml config | awk -v srv="$service" '
               $0 ~ srv {found=1}
               found && /image:/ {print $2; exit}
             ')
