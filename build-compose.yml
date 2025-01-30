@@ -10,3 +10,9 @@
     build:
       context: .
       dockerfile: ./KestrelsDocker-ReversProxy/Dockerfile
+      
+  kestrelwiki-host:
+    image: kestrelwiki-host
+    build:
+      context: .
+      dockerfile: ./kestrelwiki-host/Dockerfile
