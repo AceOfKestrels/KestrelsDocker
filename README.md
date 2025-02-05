@@ -7,11 +7,35 @@ the website consists of the following projects:
 - [KestrelsWiki](https://github.com/AceOfKestrels/KestrelsWiki) The API That Provides the wiki Content
 
 ## Deployment
-TODO
+### Prerequisites
+
+- setup a x86 or arm64 system
+- Install Docker on the system
+
+### Docker Compose
+
+- Create A Folder and enter it
+    ```Bash
+        mkdir KestrelsDocker
+        cd KestrelsDocker
+    ```
+  
+- Download the Docker Compose File
+    ```Bash
+        wget https://raw.githubusercontent.com/AceOfKestrels/KestrelsDocker/refs/heads/main/docker-compose.yml
+    ```
+  
+- Fill out the needed ENV Data
+
+- Start the Project
+    ```Bash
+        docker compose up
+    ```
+
 
 ## Dependency's used
 
-### in the [KestrelsNest](https://hub.docker.com/_/nginx) Host
+### in the [KestrelsNest](https://github.com/AceOfKestrels/KestrelsNest) Host
 - [NGINX](https://hub.docker.com/_/nginx)
 - [DCron](https://github.com/dubiousjim/dcron)
 
@@ -19,5 +43,6 @@ TODO
 - [Caddy](https://hub.docker.com/_/caddy/)
 - [Cloudflare module](https://github.com/caddy-dns/cloudflare) for Caddy
 
-### in the KestrelWiki Host
+### in the [KestrelsWiki](https://github.com/AceOfKestrels/KestrelsWiki) Host
+- [ASP.Net](https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/docker/building-net-docker-images?view=aspnetcore-9.0#aspnet-core-docker-images)
   
