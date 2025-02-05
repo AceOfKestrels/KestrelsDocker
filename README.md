@@ -24,7 +24,17 @@ the website consists of the following projects:
     ```Bash
         wget https://raw.githubusercontent.com/AceOfKestrels/KestrelsDocker/refs/heads/main/docker-compose.yml
     ```
+- Create a .env File and out copy the following content into it and fill out the data nedded
+    ```dotenv
+        # Revers Proxy Config
+        CLOUDFLARE_TOKEN=YourDNSToken #your cloudflair dns token with zone edit rights for the used domain
+        ADMIN_EMAIL=your-mail@example.com #the mail on wich the SSL Certs are Bound
+        WEB_ADRESS=example.com #the web adress of the frontend
   
+        # Kestrels Wiki Config
+        WEBPAGE_GIT_REPO=https://github.com/AceOfKestrels/kestrelsnest.git
+        
+    ```
 - Fill out the needed ENV Data
 
 - Start the Project
