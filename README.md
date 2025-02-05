@@ -35,7 +35,6 @@ the website consists of the following projects:
         WEBPAGE_GIT_REPO=https://github.com/AceOfKestrels/kestrelsnest.git
         
     ```
-- Fill out the needed ENV Data
 
 - Start the Project
     ```Bash
