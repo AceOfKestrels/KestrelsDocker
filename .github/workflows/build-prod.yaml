@@ -57,7 +57,6 @@ jobs:
           done
           echo "✅ All Caddyfiles are valid."
 
-
   build-images:
     name: Build and Push Docker Images
     needs: validate-files
@@ -72,7 +71,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y docker-compose yq
 
-      - name: Update QEMU
+      - name: Update QEMU for multi-arch builds
         run: |
           docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
@@ -104,14 +103,15 @@ jobs:
             fi
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
-            prod_tag="${image_name_with_registry}:prod"
-            echo "Building and pushing: $image_name_with_registry with prod tag"
-          
+            dev_tag="${image_name_with_registry}:prod"
+            echo "Building and pushing: $image_name_with_registry with dev tag"
+
             docker buildx build \
               --platform linux/amd64,linux/arm64 \
               --file "./${image_name}/Dockerfile" \
+              --build-arg INSTALL_GO=true \
               --tag "$image_name_with_registry" \
-              --tag "$prod_tag" \
+              --tag "$dev_tag" \
               --push \
               .
           done
@@ -144,9 +144,9 @@ jobs:
             fi
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
-            prod_tag="${image_name_with_registry}:prod"
-            if docker pull "$image_name_with_registry" && docker pull "$prod_tag"; then
-              echo "✅ Successfully pushed and verified: $service ($image_name_with_registry and $prod_tag)"
+            dev_tag="${image_name_with_registry}:prod"
+            if docker pull "$image_name_with_registry" && docker pull "$dev_tag"; then
+              echo "✅ Successfully pushed and verified: $service ($image_name_with_registry and $dev_tag)"
             else
               echo "❌ Failed to verify image: $service"
               exit 1

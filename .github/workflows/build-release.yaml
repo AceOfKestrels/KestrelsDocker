@@ -1,4 +1,4 @@
-﻿name: Build and Push Docker Images on Release
+﻿name: Build Containers on main branch and prod tag
 
 on:
   release:
@@ -56,10 +56,11 @@ jobs:
           done
           echo "✅ All Caddyfiles are valid."
 
-
-
   build-images:
     name: Build and Push Docker Images
+    needs: validate-files
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
     runs-on: ubuntu-latest
 
     steps:
@@ -71,7 +72,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y docker-compose yq
 
-      - name: Update QEMU
+      - name: Update QEMU for multi-arch builds
         run: |
           docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
@@ -89,10 +90,7 @@ jobs:
           install: true
 
       - name: Build and push Docker images
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          echo "Release tag: $RELEASE_TAG"
           services=$(docker-compose -f build-compose.yml config --services)
           for service in $services; do
             echo "Processing service: $service"
@@ -106,21 +104,24 @@ jobs:
             fi
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
-            tag="${image_name_with_registry}:${RELEASE_TAG}"
-            echo "Building and pushing: $image_name_with_registry with prod tag"
-          
+            dev_tag="${image_name_with_registry}:${RELEASE_TAG}"
+            echo "Building and pushing: $image_name_with_registry with dev tag"
+
             docker buildx build \
               --platform linux/amd64,linux/arm64 \
               --file "./${image_name}/Dockerfile" \
+              --build-arg INSTALL_GO=true \
               --tag "$image_name_with_registry" \
-              --tag "$tag" \
+              --tag "$dev_tag" \
               --push \
               .
           done
-        
+
   validate-images:
     name: Validate Docker Images
     needs: build-images
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
     runs-on: ubuntu-latest
 
     steps:
@@ -133,8 +134,6 @@ jobs:
           sudo apt-get install -y docker-compose yq
 
       - name: Verify pushed images
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           services=$(docker-compose -f build-compose.yml config --services)
           for service in $services; do
@@ -148,9 +147,9 @@ jobs:
             fi
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
-            tag="${image_name_with_registry}:${RELEASE_TAG}"
-            if docker pull "$image_name_with_registry" && docker pull "$tag"; then
-              echo "✅ Successfully pushed and verified: $service ($image_name_with_registry and $tag)"
+            dev_tag="${image_name_with_registry}:${RELEASE_TAG}"
+            if docker pull "$image_name_with_registry" && docker pull "$dev_tag"; then
+              echo "✅ Successfully pushed and verified: $service ($image_name_with_registry and $dev_tag)"
             else
               echo "❌ Failed to verify image: $service"
               exit 1
