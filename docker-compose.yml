@@ -16,7 +16,6 @@
       kestrelwiki-host: {}
     volumes:
       - ./logs/KestrelsDocker-ReversProxy/caddy:/var/log/caddy/
-      - ./data/caddy-data:/data
     ports: 
       - "80:80"
       - "443:443"
