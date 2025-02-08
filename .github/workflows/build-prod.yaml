@@ -7,23 +7,20 @@ on:
   workflow_dispatch:
 
 jobs:
+  ### 1. Validate Files (Dockerfiles, nginx.conf, Caddyfiles)
   validate-files:
     name: Validate Dockerfiles, nginx.conf, and Caddyfiles
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Validate Dockerfiles
+      - name: Validate Dockerfiles with Hadolint
         run: |
           echo "Validating Dockerfiles..."
           find . -name 'Dockerfile' | while read dockerfile; do
             echo "Validating $dockerfile"
-            docker run --rm -i hadolint/hadolint < "$dockerfile" || {
-              echo "❌ Validation failed for $dockerfile"
-              exit 1
-            }
+            docker run --rm -i hadolint/hadolint < "$dockerfile" || { echo "❌ Validation failed for $dockerfile"; exit 1; }
           done
           echo "✅ All Dockerfiles are valid."
 
@@ -32,10 +29,7 @@ jobs:
           echo "Validating nginx.conf files..."
           find . -name 'nginx.conf' | while read nginx_conf; do
             echo "Validating $nginx_conf"
-            docker run --rm -v "$(pwd):/config" nginx:stable nginx -t -c "/config/$nginx_conf" || {
-              echo "❌ Validation failed for $nginx_conf"
-              exit 1
-            }
+            docker run --rm -v "$(pwd):/config" nginx:stable nginx -t -c "/config/$nginx_conf" || { echo "❌ Validation failed for $nginx_conf"; exit 1; }
           done
           echo "✅ All nginx.conf files are valid."
 
@@ -50,30 +44,23 @@ jobs:
               -e KESTRELSNEST_HOST=http://kestrelsnest-host \
               -e KESTRELSWIKI_HOST=http://kestrelwiki-host \
               -e DNS_TOKEN=example_token \
-              -v "$(pwd):/srv" ghcr.io/caddybuilds/caddy-cloudflare:latest caddy validate --config "/srv/$caddyfile" || {
-              echo "❌ Validation failed for $caddyfile"
-              exit 1
-            }
+              -v "$(pwd):/srv" ghcr.io/caddybuilds/caddy-cloudflare:latest caddy validate --config "/srv/$caddyfile" || { echo "❌ Validation failed for $caddyfile"; exit 1; }
           done
           echo "✅ All Caddyfiles are valid."
 
-  build-images:
-    name: Build and Push Docker Images
+  ### 2. Build Images for AMD64
+  build-images-amd64:
+    name: Build and Push Docker Images (AMD64)
     needs: validate-files
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Install Docker Compose and yq
         run: |
           sudo apt-get update
           sudo apt-get install -y docker-compose yq
-
-      - name: Update QEMU for multi-arch builds
-        run: |
-          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -82,13 +69,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
-          install: true
-
-      - name: Build and push Docker images
+      - name: Build and Push Images (AMD64)
         run: |
           services=$(docker-compose -f build-compose.yml config --services)
           for service in $services; do
@@ -103,26 +84,18 @@ jobs:
             fi
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
-            dev_tag="${image_name_with_registry}:prod"
-            echo "Building and pushing: $image_name_with_registry with dev tag"
-
-            docker buildx build \
-              --platform linux/amd64,linux/arm64 \
-              --file "./${image_name}/Dockerfile" \
-              --build-arg INSTALL_GO=true \
-              --tag "$image_name_with_registry" \
-              --tag "$dev_tag" \
-              --push \
-              .
+            echo "Building (AMD64) $image_name_with_registry"
+            docker build --file "./${image_name}/Dockerfile" --build-arg INSTALL_GO=true --build-arg ARCH="x64" -t "$image_name_with_registry:amd64" .
+            docker push "$image_name_with_registry:amd64"
           done
 
-  validate-images:
-    name: Validate Docker Images
-    needs: build-images
-    runs-on: ubuntu-latest
-
+  ### 3. Build Images for ARM64
+  build-images-arm64:
+    name: Build and Push Docker Images (ARM64)
+    needs: validate-files
+    runs-on: ubuntu-24.04-arm
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Install Docker Compose and yq
@@ -130,7 +103,97 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y docker-compose yq
 
-      - name: Verify pushed images
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Images (ARM64)
+        run: |
+          services=$(docker-compose -f build-compose.yml config --services)
+          for service in $services; do
+            echo "Processing service: $service"
+            image_name=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
+              $0 ~ srv {found=1}
+              found && /image:/ {print $2; exit}
+            ')
+            if [ -z "$image_name" ]; then
+              echo "❌ Image name not found for service: $service"
+              exit 1
+            fi
+            image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
+            image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
+            echo "Building (ARM64) $image_name_with_registry"
+            docker build --file "./${image_name}/Dockerfile" --build-arg INSTALL_GO=true --build-arg ARCH="arm64" -t "$image_name_with_registry:arm64" .
+            docker push "$image_name_with_registry:arm64"
+          done
+
+  ### 4. Create Multi-Arch Manifest with "prod" Tag and Alias "latest"
+  create-manifest:
+    name: Create and Push Multi-Arch Manifest
+    needs:
+      - build-images-amd64
+      - build-images-arm64
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Docker Compose and yq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose yq
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and Push Multi-Arch Manifest
+        run: |
+          services=$(docker-compose -f build-compose.yml config --services)
+          for service in $services; do
+            echo "Processing service: $service for manifest creation"
+            image_name=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
+              $0 ~ srv {found=1}
+              found && /image:/ {print $2; exit}
+            ')
+            if [ -z "$image_name" ]; then
+              echo "❌ Image name not found for service: $service"
+              exit 1
+            fi
+            image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
+            image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
+            prod_tag="${image_name_with_registry}:prod"
+            echo "Creating manifest for $prod_tag"
+            docker manifest create "$prod_tag" "$image_name_with_registry:amd64" "$image_name_with_registry:arm64"
+            docker manifest push "$prod_tag"
+
+            latest_tag="${image_name_with_registry}:latest"
+            echo "Creating alias manifest for $latest_tag (prod as latest)"
+            docker manifest create "$latest_tag" "$image_name_with_registry:amd64" "$image_name_with_registry:arm64"
+            docker manifest push "$latest_tag"
+          done
+
+  ### 5. Validate the Pushed Manifests (Pull Test)
+  validate-images:
+    name: Validate Pushed Images (Pull Test)
+    needs: create-manifest
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Docker Compose and yq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose yq
+
+      - name: Verify Manifest Images
         run: |
           services=$(docker-compose -f build-compose.yml config --services)
           for service in $services; do
@@ -144,11 +207,123 @@ jobs:
             fi
             image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
             image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
-            dev_tag="${image_name_with_registry}:prod"
-            if docker pull "$image_name_with_registry" && docker pull "$dev_tag"; then
-              echo "✅ Successfully pushed and verified: $service ($image_name_with_registry and $dev_tag)"
-            else
-              echo "❌ Failed to verify image: $service"
+            prod_tag="${image_name_with_registry}:prod"
+            latest_tag="${image_name_with_registry}:latest"
+            echo "Verifying manifest image: $prod_tag"
+            docker pull "$prod_tag" || { echo "❌ Failed to pull image: $prod_tag"; exit 1; }
+            echo "Verifying manifest image: $latest_tag"
+            docker pull "$latest_tag" || { echo "❌ Failed to pull image: $latest_tag"; exit 1; }
+          done
+
+  ### 6. Test the Images at Runtime (Only Check Container Startup)
+  test-images:
+    name: Test Multi-Arch Images at Runtime
+    needs: create-manifest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Test Container Startup on ${{ matrix.arch }}
+        run: |
+          services=$(docker-compose -f build-compose.yml config --services)
+          for service in $services; do
+            echo "Testing service: $service on architecture ${{ matrix.arch }}"
+            image_name=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
+              $0 ~ srv {found=1}
+              found && /image:/ {print $2; exit}
+            ')
+            if [ -z "$image_name" ]; then
+              echo "❌ Image name not found for service: $service"
               exit 1
             fi
+            image_name_with_registry="ghcr.io/${{ github.repository_owner }}/${image_name}"
+            image_name_with_registry=$(echo "$image_name_with_registry" | tr '[:upper:]' '[:lower:]')
+            prod_tag="${image_name_with_registry}:prod"
+            echo "Running container from $prod_tag on ${{ matrix.arch }}..."
+
+            # Set environment variables based on the service (adjust as needed)
+            envs=""
+            if [ "$image_name" = "kestrelsdocker-reversproxy" ]; then
+              envs="-e DNS_TOKEN=example_dns-token -e ADMIN_MAIL=mail@example.com -e WEB_ADDRESS=example.com -e KESTRELSNEST_HOST=http://kestrelsnest-host -e KESTRELSWIKI_HOST=http://kestrelwiki-host"
+            elif [ "$image_name" = "kestrelwiki-host" ]; then
+              envs="-e ASPNETCORE_HTTP_PORTS=80 -e CONTENT_PATH='../content' -e WEBROOT_PATH='../wwwroot' -e WEBPAGE_REPOSITORY=https://github.com/AceOfKestrels/kestrelsnest.git -e FILE_LOGGING=true -e LOG_PATH=/var/log/kestrelswiki"
+            fi
+
+            container_id=$(docker run --rm -d --platform "linux/${{ matrix.arch }}" $envs "$prod_tag")
+            if [ -z "$container_id" ]; then
+              echo "Failed to start container for service $service on architecture ${{ matrix.arch }}"
+              exit 1
+            fi
+            sleep 10
+            running=$(docker inspect -f '{{.State.Running}}' $container_id)
+            if [ "$running" != "true" ]; then
+              echo "Container for service $service on architecture ${{ matrix.arch }} did not start properly."
+              docker logs $container_id
+              exit 1
+            fi
+            docker stop $container_id
+            echo "Test passed: Container for service $service on architecture ${{ matrix.arch }} started successfully."
+          done
+
+  ### 7. Cleanup Old Build Artifact Tags (Preserve Underlying Images for Manifest)
+  cleanup-tags:
+    name: Clean Up Old Build Artifact Tags
+    needs: [validate-images, test-images]
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install GitHub CLI, jq and Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh jq docker-compose
+
+      - name: Remove Old Build Artifact Tags from GHCR
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          echo "Cleaning up old build artifact tags..."
+          # This script deletes only versions older than 30 days for tags matching "amd64" or "arm64".
+          services=$(docker-compose -f build-compose.yml config --services)
+          for service in $services; do
+            echo "Processing service: $service"
+            image_name=$(docker-compose -f build-compose.yml config | awk -v srv="$service" '
+              $0 ~ srv {found=1}
+              found && /image:/ {print $2; exit}
+            ')
+            if [ -z "$image_name" ]; then
+              echo "❌ Image name not found for service: $service"
+              exit 1
+            fi
+            package_name=$(echo "$image_name" | tr '[:upper:]' '[:lower:]')
+            echo "Cleaning up build artifact tags for package: $OWNER/$package_name"
+            versions=$(gh api --paginate "/users/$OWNER/packages/container/$package_name/versions" --jq '.[]')
+            echo "$versions" | jq -c 'select(.metadata.container.tags[]? | test("^(amd64|arm64)$"))' | while read version; do
+              created_at=$(echo "$version" | jq -r '.created_at')
+              # Only delete versions older than 30 days
+              if [[ $(date -d "$created_at" +%s) -lt $(date -d "30 days ago" +%s) ]]; then
+                version_id=$(echo "$version" | jq -r '.id')
+                tags=$(echo "$version" | jq -r '.metadata.container.tags | join(",")')
+                echo "Deleting version $version_id with tags: $tags"
+                gh api -X DELETE "/users/$OWNER/packages/container/$package_name/versions/$version_id"
+              else
+                echo "Keeping recent version created at $created_at"
+              fi
+            done
           done
