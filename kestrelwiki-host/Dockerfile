@@ -18,9 +18,13 @@ WORKDIR /app/src
 # hadolint ignore=DL3059
 RUN dotnet restore
 
+# Get System Arch
+# hadolint ignore=DL3059
+RUN echo "ARCH=$(uname -m)" >> /etc/environment
+
 # Build and publish the application
 # hadolint ignore=DL3059
-RUN dotnet publish -c Release -o out
+RUN dotnet publish -c Release -o out -a "$ARCH"
 
 # Use the official ASP.NET runtime image for production
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
