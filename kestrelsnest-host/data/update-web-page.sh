@@ -1,42 +1,68 @@
 #!/bin/bash
 
-# Set the working directory
+# Set variables
 WEB_DIR="/var/www"
 ICON_SCRIPT="/var/www/icon_generator/generate_icons.sh"
+LOG_DIR="/var/log/nginx"
+LOG_FILE="$LOG_DIR/git.log"
 
-# Navigate to the repo directory
+# Ensure the log directory exists
+mkdir -p "$LOG_DIR"
+
+# Redirect all output (stdout and stderr) to the log file
+exec > "$LOG_FILE" 2>&1
+
+echo "-------------------------------"
+echo "Script started at $(date)"
+echo "-------------------------------"
+
+# Navigate to the repository directory
 cd "$WEB_DIR" || { echo "Failed to navigate to $WEB_DIR"; exit 1; }
 
-# Stash local changes if necessary
+# Clean up any local changes
+echo "Resetting and cleaning local changes..."
 git reset --hard
 git clean -fd
 
-# Pull latest changes
-git pull origin main > /tmp/git_pull_output.log 2>&1
+# Record the current commit hash
+PREV_COMMIT=$(git rev-parse HEAD)
+
+# Fetch the latest changes from the 'main' branch with prune
+echo "Fetching latest changes from the 'main' branch with prune..."
+git fetch --prune origin main
+
+# Reset local repository to match origin/main
+echo "Resetting local repository to origin/main..."
+git reset --hard origin/main
 GIT_STATUS=$?
 
-# Check if there were changes
-if grep -q "Already up to date." /tmp/git_pull_output.log; then
+if [[ $GIT_STATUS -ne 0 ]]; then
+    echo "Git reset failed. Exiting."
+    exit 1
+fi
+
+# Record the new commit hash
+NEW_COMMIT=$(git rev-parse HEAD)
+
+# Check if there were any updates
+if [ "$PREV_COMMIT" == "$NEW_COMMIT" ]; then
     echo "No updates found. Exiting."
     exit 0
 fi
 
-# If there were updates, run the icon generator script
-if [[ $GIT_STATUS -eq 0 ]]; then
-    echo "Updates detected. Running icon generator script."
-    chmod +x "$ICON_SCRIPT"
-    "$ICON_SCRIPT"
-else
-    echo "Git pull failed. Exiting."
-    exit 1
-fi
+echo "Updates detected. Running icon generator script..."
+chmod +x "$ICON_SCRIPT"
+"$ICON_SCRIPT"
 
-# Set permissions
+# Set permissions on the web directory
 echo "Setting permissions for $WEB_DIR"
 chmod -R 777 "$WEB_DIR"
 
-# Reload Nginx
+# Reload Nginx to apply any changes
 echo "Reloading Nginx"
 nginx -s reload
 
 echo "Update and reload completed successfully."
+echo "-------------------------------"
+echo "Script finished at $(date)"
+echo "-------------------------------"
