@@ -15,14 +15,14 @@
       kestrelsnest-host: {}
       kestrelwiki-host: {}
     volumes:
-      - ./logs/KestrelsDocker-ReversProxy/caddy:/var/log/caddy/
+      - ./logs/kestrelsdocker-reversproxy/caddy/:/var/log/caddy/
     ports: 
       - "80:80"
       - "443:443"
     environment:
-      - DNS_TOKEN={$CLOUDFLARE_TOKEN}
-      - ADMIN_MAIL={$ADMIN_EMAIL}
-      - WEB_ADDRESS={$WEB_ADRESS}
+      - DNS_TOKEN=${CLOUDFLARE_TOKEN}
+      - ADMIN_MAIL=${ADMIN_EMAIL}
+      - WEB_ADDRESS=${WEB_ADRESS}
     dns:
       - 1.1.1.1
       - 8.8.8.8 
@@ -34,7 +34,7 @@
       kestrelwiki-host: {}
       keydb-host: {}
     environment:
-      - WEBPAGE_REPOSITORY={$WEBPAGE_GIT_REPO}
+      - WEBPAGE_REPOSITORY=${WEBPAGE_GIT_REPO}
     volumes:
       - /logs/kestrelwiki-host/api:/var/log/kestrelswiki
   
