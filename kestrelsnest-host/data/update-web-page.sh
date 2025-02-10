@@ -9,8 +9,8 @@ LOG_FILE="$LOG_DIR/git.log"
 # Ensure the log directory exists
 mkdir -p "$LOG_DIR"
 
-# Redirect all output (stdout and stderr) to the log file
-exec > "$LOG_FILE" 2>&1
+# Redirect all output (stdout and stderr) to the log file in append mode
+exec >> "$LOG_FILE" 2>&1
 
 echo "-------------------------------"
 echo "Script started at $(date)"
