@@ -8,9 +8,9 @@
     reverse_proxy {$KESTRELSNEST_HOST}
     reverse_proxy /api/* {$KESTRELSWIKI_HOST}
     
-    tls {
-      dns cloudflare {$DNS_TOKEN}
-    }
+    #tls {
+    #  dns cloudflare {$DNS_TOKEN}
+    #}
 
     # access log Config
     log {

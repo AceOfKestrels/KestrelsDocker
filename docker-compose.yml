@@ -17,6 +17,7 @@
       kestrelwiki-host: {}
     volumes:
       - ./logs/kestrelsdocker-reversproxy/caddy/:/var/log/caddy/
+      - ./data/caddy:/data
     ports: 
       - "80:80"
       - "443:443"
@@ -36,7 +37,7 @@
       kestrelwiki-host: {}
       valkey-host: {}
     environment:
-      - WEBPAGE_REPOSITORY=${WEBPAGE_GIT_REPO}
+      - CONTENT_REPOSITORY=${CONTENT_GIT_REPOSITORY}
     volumes:
       - /logs/kestrelwiki-host/api:/var/log/kestrelswiki
     restart: always

@@ -37,10 +37,7 @@ COPY --from=build /app/src/out ./
 EXPOSE 80
 
 # Setup web ENVs
-ENV ASPNETCORE_HTTP_PORTS=80 \
-    CONTENT_PATH="../content" \
-    WEBROOT_PATH="../wwwroot" \
-    WEBPAGE_REPOSITORY="https://github.com/AceOfKestrels/kestrelsnest.git"
+ENV ASPNETCORE_HTTP_PORTS=80
 
 # Setup logging directory
 RUN mkdir /var/log/kestrelswiki && chmod 777 -R /var/log/kestrelswiki
