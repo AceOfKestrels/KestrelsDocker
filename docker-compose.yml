@@ -7,7 +7,8 @@
       kestrelsnest-host: {}
     volumes:
       - ./logs/kestrelsnest-host/nginx/:/var/log/nginx/
-  
+    restart: always  
+    
   # The ReversProxy that Routes the Web Traffic to the corresponding backend servers
   kestrelsdocker-reversproxy:
     image: ghcr.io/aceofkestrels/kestrelsdocker-reversproxy:prod
@@ -25,24 +26,27 @@
       - WEB_ADDRESS=${WEB_ADRESS}
     dns:
       - 1.1.1.1
-      - 8.8.8.8 
+      - 8.8.8.8
+    restart: always
 
   # The API host of the KetrelsWiki
   kestrelwiki-host:
     image: ghcr.io/aceofkestrels/kestrelwiki-host:prod
     networks:
       kestrelwiki-host: {}
-      keydb-host: {}
+      valkey-host: {}
     environment:
       - WEBPAGE_REPOSITORY=${WEBPAGE_GIT_REPO}
     volumes:
       - /logs/kestrelwiki-host/api:/var/log/kestrelswiki
+    restart: always
   
   # The redis to be used with the KestrelsWiki
-  kestrelsdocker-keyDB:
-    image: eqalpha/keydb
+  kestrelsdocker-valkey:
+    image: valkey/valkey:8.0.2-alpine3.21
     networks:
-      keydb-host: {}
+      valkey-host: {}
+    restart: always
   
 networks:
   kestrelsdocker-reversproxy:
@@ -51,5 +55,5 @@ networks:
     internal: false
   kestrelwiki-host:
     internal: false
-  keydb-host:
+  valkey-host:
     internal: true

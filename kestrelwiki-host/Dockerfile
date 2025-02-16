@@ -19,8 +19,15 @@ RUN dotnet restore --force-evaluate
 # Build and publish the application
 # hadolint ignore=DL3059
 RUN dotnet publish kestrelswiki/kestrelswiki.csproj -c Release -o out
+
 # Use the official ASP.NET runtime image for production
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+
+# Install Git
+# hadolint ignore=DL3015,DL3008
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
+# set workdir
 WORKDIR /app
 
 # Copy the published files
