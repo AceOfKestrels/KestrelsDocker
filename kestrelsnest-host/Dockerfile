@@ -17,7 +17,7 @@ COPY ./kestrelsnest-host/data/update-web-page.sh /scripts/update-web-page.sh
 
 # Make Script Executabel and add it to cron
 RUN chmod 777 /scripts/update-web-page.sh && \
-    echo "*/5 * * * * /scripts/update-web-page.sh" > /etc/crontabs/root && \
+    echo "*/1 * * * * /scripts/update-web-page.sh" > /etc/crontabs/root && \
     chmod 0644 /etc/crontabs/root && \
     touch /var/log/nginx/git.log && \
     chmod 0644 /var/log/nginx/git.log 
