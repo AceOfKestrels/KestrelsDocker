@@ -9,11 +9,11 @@ RUN mkdir -p /var/www && \
     sh /var/www/icon_generator/generate_icons.sh \
     chmod -R 777 /var/www
 # Copy the custom NGINX configuration into the container
-COPY ./kestrelsnest-host/data/nginx.conf /etc/nginx/nginx.conf
-COPY ./kestrelsnest-host/data/mime.types /etc/nginx/mime.types
+COPY ./kestrelsnest-host/data/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY ./kestrelsnest-host/data/nginx/mime.types /etc/nginx/mime.types
 
 # Copy Pull Script into container
-COPY ./kestrelsnest-host/data/update-web-page.sh /scripts/update-web-page.sh
+COPY ./kestrelsnest-host/data/scripts/update-web-page.sh /scripts/update-web-page.sh
 
 # Make Script Executabel and add it to cron
 RUN chmod 777 /scripts/update-web-page.sh && \
