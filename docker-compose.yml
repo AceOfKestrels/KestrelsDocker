@@ -39,7 +39,7 @@
     environment:
       - CONTENT_REPOSITORY=${CONTENT_GIT_REPOSITORY}
     volumes:
-      - /logs/kestrelwiki-host/api:/var/log/kestrelswiki
+      - ./logs/kestrelwiki-host/api:/var/log/kestrelswiki
     restart: always
   
   # The redis to be used with the KestrelsWiki
