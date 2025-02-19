@@ -36,8 +36,6 @@
     networks:
       kestrelwiki-host: {}
       valkey-host: {}
-    environment:
-      - CONTENT_REPOSITORY=${CONTENT_GIT_REPOSITORY}
     volumes:
       - ./logs/kestrelwiki-host/api:/var/log/kestrelswiki
     restart: always

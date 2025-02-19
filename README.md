@@ -29,11 +29,7 @@ the website consists of the following projects:
         # Revers Proxy Config
         CLOUDFLARE_TOKEN=YourDNSToken #your cloudflair dns token with zone edit rights for the used domain
         ADMIN_EMAIL=your-mail@example.com #the mail on wich the SSL Certs are Bound
-        WEB_ADRESS=example.com #the web adress of the frontend
-
-        # Kestrels Wiki Config
-        CONTENT_GIT_REPOSITORY=https://github.com/aceofkestrels/brain.git
-        
+        WEB_ADRESS=example.com #the web adress of the frontend        
     ```
 
 - Start the Project
